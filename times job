@@ -1,0 +1,87 @@
+import requests
+from bs4 import BeautifulSoup
+import matplotlib.pyplot as plt
+
+# Function to scrape job data
+def scrape_job_data(url):
+    response = requests.get(url)
+    if response.status_code == 200:
+        soup = BeautifulSoup(response.text, 'html.parser')
+        job_containers = soup.find_all('li', class_='clearfix job-bx wht-shd-bx')
+
+        job_data = []
+        for job_container in job_containers:
+            job_title_raw = job_container.find('strong', class_='blkclor').text.strip()
+            additional_info_element = job_container.find('span', class_='job-add')
+            additional_info = additional_info_element.text.strip() if additional_info_element else ''
+            job_title = f"{job_title_raw} {additional_info}".strip()
+
+            company_name_raw = job_container.find('h3', class_='joblist-comp-name').text.strip()
+            company_name = company_name_raw.replace('(More Jobs)', '').strip()
+
+            experience = job_container.find('ul', class_='top-jd-dtl clearfix').find('li').text.strip().replace('card_travel', '')
+
+            location_container = job_container.find('ul', class_='top-jd-dtl clearfix').find_all('li')[1]
+            location_items = location_container.find_all('span')
+            location = ', '.join(item['title'] for item in location_items)
+
+            salary_container = job_container.find('ul', class_='top-jd-dtl clearfix').find_all('li', class_='salary')
+            salary = salary_container[0].text.strip() if salary_container else 'Not specified'
+
+            job_data.append({
+                'Job Title': job_title,
+                'Company Name': company_name,
+                'Location': location,
+                'Experience': experience,
+                'Salary': salary
+            })
+
+        return job_data
+    else:
+        print(f"Failed to retrieve the page. Status code: {response.status_code}")
+        return None
+# Function to visualize job data with bar and pie charts
+def visualize_job_data(job_data):
+    # Bar chart for number of jobs by experience level
+    experience_levels = [job['Experience'] for job in job_data]
+    plt.figure(figsize=(16, 8))
+    plt.subplot(1, 2, 1)
+    plt.bar(experience_levels, len(experience_levels), color='skyblue')
+    plt.title('Number of Jobs by Experience Level')
+    plt.xlabel('Experience Level')
+    plt.ylabel('Number of Jobs')
+
+    # Pie chart for job distribution by location
+    location_counts = {}
+    for job in job_data:
+        locations = [loc.strip() for loc in job['Location'].split(',')]
+        for location in locations:
+            location_counts[location] = location_counts.get(location, 0) + 1
+
+    plt.subplot(1, 2, 2)
+    plt.pie(location_counts.values(), labels=location_counts.keys(), autopct='%1.1f%%', startangle=140)
+    plt.title('Job Distribution by Location')
+
+    # Show the plots
+    plt.tight_layout()
+    plt.show()
+
+visualize_job_data(job_data)
+# URL of the TimesJobs job search results page
+url = 'https://www.timesjobs.com/candidate/job-search.html?searchType=personalizedSearch&from=submit&txtKeywords=%22Data+Science%22&txtLocation='
+
+# Scrape job data
+job_data = scrape_job_data(url)
+
+# Print the extracted job data
+if job_data:
+    for job in job_data:
+        print(f"Job Title: {job['Job Title']}")
+        print(f"Company Name: {job['Company Name']}")
+        print(f"Location: {job['Location']}")
+        print(f"Experience: {job['Experience']}")
+        print(f"Salary: {job['Salary']}")
+        print("---")
+
+else:
+    print("No job data available.")
